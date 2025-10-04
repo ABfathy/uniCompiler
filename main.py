@@ -15,11 +15,24 @@ def lexical_walk(equation: str) -> str:
             continue
         
         elif ch == '.' and i + 1 < n and equation[i + 1].isdigit():
+            if i > 0 and (equation[i - 1].isalnum() or equation[i - 1] == '_'):
+                raise ValueError(f"Invalid token '{equation[i]}' at position {i}")
+
             num: str = "0."
             i += 1
-            while i < n and equation[i].isdigit():
+            has_dot: bool = True
+            while i < n and (equation[i].isdigit() or equation[i] == '.'):
+                if equation[i] == '.':
+                    raise ValueError(f"Invalid token '{equation[i]}' at position {i}")
                 num += equation[i]
                 i += 1
+
+            if num.endswith('.'):
+                num += '0'
+
+            if i < n and (equation[i].isalpha() or equation[i] == '_'):
+                raise ValueError(f"Invalid token '{equation[i]}' at position {i}")
+
             result_tokens.append(num)
 
         elif ch.isdigit():
@@ -29,7 +42,7 @@ def lexical_walk(equation: str) -> str:
             while i < n and (equation[i].isdigit() or equation[i] == '.'):
                 if equation[i] == '.':
                     if has_dot:
-                        raise ValueError(f"Invalid token at position {i}")
+                        raise ValueError(f"Invalid token '{equation[i]}' at position {i}")
                     has_dot = True
                 num += equation[i]
                 i += 1
@@ -38,7 +51,7 @@ def lexical_walk(equation: str) -> str:
                 num += '0'
                 
             if i < n and (equation[i].isalpha() or equation[i] == '_'):
-                raise ValueError(f"Invalid token at position {i}")
+                raise ValueError(f"Invalid token '{equation[i]}' at position {i}")
             
             result_tokens.append(num)
         
