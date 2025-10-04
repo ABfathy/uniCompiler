@@ -26,8 +26,10 @@ def lexical_walk(equation: str) -> str:
             num: str = ch
             i += 1
             has_dot: bool = False
-            while i < n and (equation[i].isdigit() or (equation[i] == '.' and not has_dot)):
+            while i < n and (equation[i].isdigit() or equation[i] == '.'):
                 if equation[i] == '.':
+                    if has_dot:
+                        raise ValueError(f"Invalid token at position {i}")
                     has_dot = True
                 num += equation[i]
                 i += 1
@@ -35,6 +37,9 @@ def lexical_walk(equation: str) -> str:
             if num.endswith('.'):
                 num += '0'
                 
+            if i < n and (equation[i].isalpha() or equation[i] == '_'):
+                raise ValueError(f"Invalid token at position {i}")
+            
             result_tokens.append(num)
         
         elif ch in string.ascii_letters or ch == '_':
@@ -56,7 +61,7 @@ def lexical_walk(equation: str) -> str:
             i += 1
                
         else:
-            raise ValueError(f"Invalid character '{ch}' at position {i}")
+            raise ValueError(f"Invalid token '{ch}' at position {i}")
     
     return " ".join(result_tokens)
 
