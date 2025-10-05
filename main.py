@@ -7,6 +7,9 @@ def read_number(equation: str, start: int) -> tuple[str, int]:
     has_dot = False
 
     while i < n and (equation[i].isdigit() or equation[i] == '.'):
+        if equation[i-1].isalpha():
+                    raise ValueError(f"Invalid token '{equation[i-1]}' at position {i-1}")
+                
         if equation[i] == '.':
             if has_dot:
                 raise ValueError(f"Invalid token '.' at position {i}")
@@ -33,7 +36,7 @@ def lexical_walk(equation: str) -> str:
 
         if ch.isspace():
             i += 1
-            continue
+            continue    
 
         elif ch.isdigit() or (ch == '.' and i + 1 < n and equation[i + 1].isdigit()):
             num, i = read_number(equation, i)
@@ -44,10 +47,10 @@ def lexical_walk(equation: str) -> str:
         elif ch in string.ascii_letters or ch == '_':
             id = ch
             i += 1
-            while i < n and (equation[i] in string.ascii_letters or equation[i].isdigit() or equation[i] == '_'):
+            while i < n and (equation[i] in string.ascii_letters or equation[i].isdigit() or equation[i] == '_'):              
                 id += equation[i]
                 i += 1
-                
+           
             if id.lower() == "pi":
                 result_tokens.append("3.14")
                 continue
