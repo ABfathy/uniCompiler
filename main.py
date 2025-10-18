@@ -1,24 +1,32 @@
 from lexer.lexer import lexical_walk
 from syntax.syntax import build_syntax_tree
-from utils.utils import print_tree, convert_tree_to_display
+from semantic.semantic import semantic_analysis
+from utils.tree_utils import print_tree, convert_tree_to_display
 
 
 def main():
+
     while True:
         try:
             equation = input("-> ").strip()
             
             if not equation:
                 continue
-  
+            
             tokens, id_map = lexical_walk(equation)
-            
             tree = build_syntax_tree(tokens)
-            
             display_tree = convert_tree_to_display(tree, id_map)
             
+
             print("\nSyntax Tree:")
             print_tree(display_tree)
+            print()
+            
+            semantic_tree = semantic_analysis(tree)
+            semantic_display_tree = convert_tree_to_display(semantic_tree, id_map)
+        
+            print("Semantic Tree:")
+            print_tree(semantic_display_tree)
             print()
             
         except KeyboardInterrupt:
