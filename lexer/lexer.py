@@ -1,5 +1,5 @@
 import string
-from typing import List
+from typing import List, Dict, Tuple
 
 class Token:
     def __init__(self, token_type: str, value: str):
@@ -8,7 +8,6 @@ class Token:
 
     def __repr__(self):
         return f"Token(type={self.type}, value='{self.value}')"
-
 
 def read_number(equation: str, start: int) -> tuple[str, int, str]:
     i = start
@@ -33,13 +32,13 @@ def read_number(equation: str, start: int) -> tuple[str, int, str]:
     return num, i, token_type
 
 
-def lexical_walk(equation: str) -> List[Token]:
-
+def lexical_walk(equation: str) -> Tuple[List[Token], Dict[str, str]]:
     i = 0
     n = len(equation)
     id_counter = 1
     tokens: List[Token] = []
     display_tokens: List[str] = []
+    id_map: Dict[str, str] = {}  
 
     while i < n:
         ch = equation[i]
@@ -71,8 +70,11 @@ def lexical_walk(equation: str) -> List[Token]:
                 display_tokens.append("3.14")
             else:
                 tokens.append(Token("IDENTIFIER", ident))
-                display_tokens.append(f"ID{id_counter}")
-                id_counter += 1
+                # Store the ID mapping
+                if ident not in id_map:
+                    id_map[ident] = f"ID{id_counter}"
+                    id_counter += 1
+                display_tokens.append(id_map[ident])
 
         elif ch in "+-*/=()":
             token_type = (
@@ -89,4 +91,4 @@ def lexical_walk(equation: str) -> List[Token]:
             raise ValueError(f"Invalid character '{ch}' at position {i}")
 
     print(f"\nToken String: {' '.join(display_tokens)}")
-    return tokens
+    return tokens, id_map

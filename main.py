@@ -1,26 +1,34 @@
 from lexer.lexer import lexical_walk
+from syntax.syntax import build_syntax_tree
+from utils.utils import print_tree, convert_tree_to_display
 
 
-def main() -> None:
+def main():
     while True:
         try:
-            line = input("-> ").strip()
-            if not line:
+            equation = input("-> ").strip()
+            
+            if not equation:
                 continue
-
-            tokens = lexical_walk(line)
-
-            print("Tokens:")
-            for token in tokens:
-                print(f"  {token}")
+  
+            tokens, id_map = lexical_walk(equation)
+            
+            tree = build_syntax_tree(tokens)
+            
+            display_tree = convert_tree_to_display(tree, id_map)
+            
+            print("\nSyntax Tree:")
+            print_tree(display_tree)
             print()
-
-        except ValueError as e:
-            print(f"Error: {e}\n")
-        except (EOFError, KeyboardInterrupt):
+            
+        except KeyboardInterrupt:
             print("\nExiting...")
             break
-
+        except EOFError:
+            print("\nExiting...")
+            break
+        except Exception as e:
+            print(f"Error: {e}\n")
 
 if __name__ == "__main__":
     main()
