@@ -70,7 +70,6 @@ def lexical_walk(equation: str) -> Tuple[List[Token], Dict[str, str]]:
                 display_tokens.append("3.14")
             else:
                 tokens.append(Token("IDENTIFIER", ident))
-                # Store the ID mapping
                 if ident not in id_map:
                     id_map[ident] = f"ID{id_counter}"
                     id_counter += 1

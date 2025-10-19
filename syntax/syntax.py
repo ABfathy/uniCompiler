@@ -27,17 +27,15 @@ def build_syntax_tree(tokens):
         return item
 
     def parse_expr(expr_list):
-
         if not expr_list:
             raise ValueError("Empty expression")
         
         expr_list = expr_list.copy()  
-            
+
 
         i = 0
         while i < len(expr_list):
             if get_value(expr_list[i]) == "(":
-
                 depth = 1
                 j = i + 1
                 while j < len(expr_list) and depth > 0:
@@ -49,7 +47,6 @@ def build_syntax_tree(tokens):
                     j += 1
                 if depth != 0:
                     raise ValueError("Unmatched parentheses")
-
 
                 sub_tree = parse_expr(expr_list[i + 1:j - 1])
                 expr_list[i:j] = [sub_tree]
@@ -77,15 +74,20 @@ def build_syntax_tree(tokens):
                 left = expr_list[i - 1]
                 right = expr_list[i + 1]
                 expr_list[i - 1:i + 2] = [Node(expr_list[i], left, right)]
-
             else:
                 i += 1
 
         if len(expr_list) != 1:
             raise ValueError("Invalid expression structure")
-            
+        
         return expr_list[0]
-    
+
+
+    if len(nodes) >= 2:
+        if get_value(nodes[1]) != "=":
+            raise SyntaxError("Expected '=' as the second token")
+
+
     eq_index = None
     for i, n in enumerate(nodes):
         if get_value(n) == "=":
