@@ -1,6 +1,7 @@
 from lexer.lexer import lexical_walk
 from syntax.syntax import build_syntax_tree
 from semantic.semantic import semantic_analysis
+from icg.icg import generate_intermediate_code
 from utils.tree_utils import print_tree, convert_tree_to_display
 
 
@@ -27,6 +28,12 @@ def main():
         
             print("Semantic Tree:")
             print_tree(semantic_display_tree)
+            print()
+
+            icg_instructions = generate_intermediate_code(semantic_tree, id_map)
+            print("Intermediate Code:")
+            for instr in icg_instructions:
+                print(instr)
             print()
             
         except KeyboardInterrupt:
