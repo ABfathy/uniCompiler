@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import math
 
 
@@ -7,6 +7,8 @@ from lexer.lexer import lexical_walk
 from syntax.syntax import build_syntax_tree, Node
 from semantic.semantic import semantic_analysis
 from icg.icg import generate_intermediate_code
+from optimization.optimizer import optimize_code
+from assembly.assembly import generate_assembly
 from utils.tree_utils import convert_tree_to_display
 
 class CompilerGUI:
@@ -14,6 +16,8 @@ class CompilerGUI:
         self.root = root
         self.root.title("UniCompiler GUI")
         self.root.geometry("1000x800")
+        
+        self.id_types = {}
         
         self.setup_theme()
         self.create_widgets()
@@ -52,8 +56,8 @@ class CompilerGUI:
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         self.entry.bind("<Return>", lambda e: self.compile())
         
-        compile_btn = ttk.Button(top_frame, text="Compile", command=self.compile)
-        compile_btn.pack(side=tk.LEFT)
+        self.compile_btn = ttk.Button(top_frame, text="Compile", command=self.compile)
+        self.compile_btn.pack(side=tk.LEFT)
 
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
@@ -88,6 +92,24 @@ class CompilerGUI:
         self.icg_text.tag_configure("line_num", foreground="#858585")
         self.icg_text.tag_configure("code", foreground="#d4d4d4")
 
+        self.opt_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.opt_frame, text="Optimized Code")
+        self.opt_text = tk.Text(self.opt_frame, bg=self.canvas_bg, fg="white", font=("Consolas", 12), padx=20, pady=20, borderwidth=0)
+        self.opt_text.pack(fill=tk.BOTH, expand=True)
+        
+        self.opt_text.tag_configure("header", font=("Segoe UI", 16, "bold"), foreground="#007acc", spacing3=10)
+        self.opt_text.tag_configure("line_num", foreground="#858585")
+        self.opt_text.tag_configure("code", foreground="#d4d4d4")
+
+        self.asm_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.asm_frame, text="Assembly Code")
+        self.asm_text = tk.Text(self.asm_frame, bg=self.canvas_bg, fg="white", font=("Consolas", 12), padx=20, pady=20, borderwidth=0)
+        self.asm_text.pack(fill=tk.BOTH, expand=True)
+        
+        self.asm_text.tag_configure("header", font=("Segoe UI", 16, "bold"), foreground="#007acc", spacing3=10)
+        self.asm_text.tag_configure("line_num", foreground="#858585")
+        self.asm_text.tag_configure("code", foreground="#d4d4d4")
+
     def add_scrollbars(self, parent, canvas):
         v_scroll = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=canvas.yview)
         h_scroll = ttk.Scrollbar(parent, orient=tk.HORIZONTAL, command=canvas.xview)
@@ -104,72 +126,136 @@ class CompilerGUI:
         equation = self.equation_var.get().strip()
         if not equation:
             return
-
-        self.token_text.delete(1.0, tk.END)
-        self.syntax_canvas.delete("all")
-        self.semantic_canvas.delete("all")
-        self.icg_text.delete(1.0, tk.END)
-
+            
+        self.compile_btn.state(['disabled'])
+        self.root.config(cursor="watch")
+        self.root.update()
+            
         try:
-            tokens, id_map = lexical_walk(equation)
+            self.id_types = {}
+
+            self.token_text.delete(1.0, tk.END)
+            self.syntax_canvas.delete("all")
+            self.semantic_canvas.delete("all")
+            self.icg_text.delete(1.0, tk.END)
+            self.opt_text.delete(1.0, tk.END)
+            self.asm_text.delete(1.0, tk.END)
             
-            display_tokens = []
-            for t in tokens:
-                if t.type == "IDENTIFIER" and t.value in id_map:
-                    display_tokens.append(id_map[t.value])
-                else:
-                    display_tokens.append(t.value)
-            token_string = " ".join(display_tokens)
-
-            self.token_text.insert(tk.END, "Lexical Analysis Result\n", "header")
+            # Reset scroll regions
+            self.syntax_canvas.configure(scrollregion=(0,0,0,0))
+            self.semantic_canvas.configure(scrollregion=(0,0,0,0))
             
-            self.token_text.insert(tk.END, "Token String\n", "subheader")
-            self.token_text.insert(tk.END, f"{token_string}\n", "content")
+            # Force UI update
+            self.root.update()
 
-            self.token_text.insert(tk.END, "Token List\n", "subheader")
-            for t in tokens:
-                self.token_text.insert(tk.END, f"• {t}\n", "content")
-            
-            self.token_text.insert(tk.END, "Symbol Table\n", "subheader")
-            for k, v in id_map.items():
-                self.token_text.insert(tk.END, f"• {k} -> {v}\n", "content")
+            try:
+                tokens, id_map = lexical_walk(equation)
+                
+                for var_name in id_map:
+                    # Check if variable is used only on LHS (assignment target)
+                    is_lhs = False
+                    is_rhs = False
+                    
+                    for i, t in enumerate(tokens):
+                        if t.type == "IDENTIFIER" and t.value == var_name:
+                            if i + 1 < len(tokens) and tokens[i+1].type == "ASSIGN":
+                                is_lhs = True
+                            else:
+                                is_rhs = True
+                    
+                    # If variable is only assigned to and never read, we don't need its type from user
+                    if is_lhs and not is_rhs:
+                        continue
 
-        except Exception as e:
-            self.token_text.insert(tk.END, f"Lexical Error:\n{str(e)}")
-            self.notebook.select(0)
-            return
+                    if var_name not in self.id_types:
+                        while True:
+                            type_input = simpledialog.askstring("Input", f"Enter type for {var_name} (int/float):", parent=self.root)
+                            if type_input and type_input.strip().lower() in ('int', 'float'):
+                                self.id_types[var_name] = type_input.strip().upper()
+                                break
+                            elif type_input is None:
+                                return
+                            else:
+                                messagebox.showerror("Error", "Invalid type. Please enter 'int' or 'float'.")
 
-        try:
-            tree = build_syntax_tree(tokens)
-            display_tree = convert_tree_to_display(tree, id_map)
-            self.draw_tree_on_canvas(self.syntax_canvas, display_tree)
-        except Exception as e:
-            self.syntax_canvas.create_text(400, 300, text=f"Syntax Error:\n{str(e)}", fill="red", font=("Segoe UI", 14))
-            self.notebook.select(1)
-            return
+                display_tokens = []
+                for t in tokens:
+                    if t.type == "IDENTIFIER" and t.value in id_map:
+                        display_tokens.append(id_map[t.value])
+                    else:
+                        display_tokens.append(t.value)
+                token_string = " ".join(display_tokens)
 
-        try:
-            semantic_tree = semantic_analysis(tree) 
-            semantic_display_tree = convert_tree_to_display(semantic_tree, id_map)
-            self.draw_tree_on_canvas(self.semantic_canvas, semantic_display_tree)
-        except Exception as e:
-            self.semantic_canvas.create_text(400, 300, text=f"Semantic Error:\n{str(e)}", fill="red", font=("Segoe UI", 14))
-            self.notebook.select(2)
-            return
+                self.token_text.insert(tk.END, "Lexical Analysis Result\n", "header")
+                
+                self.token_text.insert(tk.END, "Token String\n", "subheader")
+                self.token_text.insert(tk.END, f"{token_string}\n", "content")
 
-        try:
-            icg_instructions = generate_intermediate_code(semantic_tree, id_map)
-            
-            self.icg_text.insert(tk.END, "Generated Intermediate Code\n", "header")
-            
-            for i, instr in enumerate(icg_instructions, 1):
-                self.icg_text.insert(tk.END, f"{i:02d}  ", "line_num")
-                self.icg_text.insert(tk.END, f"{instr}\n", "code")
+                self.token_text.insert(tk.END, "Token List\n", "subheader")
+                for t in tokens:
+                    self.token_text.insert(tk.END, f"• {t}\n", "content")
+                
+                self.token_text.insert(tk.END, "Symbol Table\n", "subheader")
+                for k, v in id_map.items():
+                    self.token_text.insert(tk.END, f"• {k} -> {v}\n", "content")
 
-        except Exception as e:
-            self.icg_text.insert(tk.END, f"ICG Error:\n{str(e)}")
-            self.notebook.select(3)
-            return
+            except Exception as e:
+                self.token_text.insert(tk.END, f"Lexical Error:\n{str(e)}")
+                self.notebook.select(0)
+                return
+
+            try:
+                tree = build_syntax_tree(tokens)
+                display_tree = convert_tree_to_display(tree, id_map)
+                self.draw_tree_on_canvas(self.syntax_canvas, display_tree)
+            except Exception as e:
+                self.syntax_canvas.create_text(400, 300, text=f"Syntax Error:\n{str(e)}", fill="red", font=("Segoe UI", 14))
+                self.notebook.select(1)
+                return
+
+            try:
+                semantic_tree = semantic_analysis(tree, self.id_types) 
+                semantic_display_tree = convert_tree_to_display(semantic_tree, id_map)
+                self.draw_tree_on_canvas(self.semantic_canvas, semantic_display_tree)
+            except Exception as e:
+                self.semantic_canvas.create_text(400, 300, text=f"Semantic Error:\n{str(e)}", fill="red", font=("Segoe UI", 14))
+                self.notebook.select(2)
+                return
+
+            try:
+                icg_instructions = generate_intermediate_code(semantic_tree, id_map)
+                
+                self.icg_text.insert(tk.END, "Generated Intermediate Code\n", "header")
+                
+                for i, instr in enumerate(icg_instructions, 1):
+                    self.icg_text.insert(tk.END, f"{i:02d}  ", "line_num")
+                    self.icg_text.insert(tk.END, f"{instr}\n", "code")
+
+                # Optimization
+                optimized_instructions = optimize_code(icg_instructions)
+                
+                self.opt_text.insert(tk.END, "Optimized Code\n", "header")
+                
+                for i, instr in enumerate(optimized_instructions, 1):
+                    self.opt_text.insert(tk.END, f"{i:02d}  ", "line_num")
+                    self.opt_text.insert(tk.END, f"{instr}\n", "code")
+
+                # Assembly Generation
+                assembly_code = generate_assembly(optimized_instructions, self.id_types)
+                
+                self.asm_text.insert(tk.END, "Assembly Code\n", "header")
+                
+                for i, instr in enumerate(assembly_code, 1):
+                    self.asm_text.insert(tk.END, f"{i:02d}  ", "line_num")
+                    self.asm_text.insert(tk.END, f"{instr}\n", "code")
+
+            except Exception as e:
+                self.icg_text.insert(tk.END, f"ICG/Optimization/Assembly Error:\n{str(e)}")
+                self.notebook.select(3)
+                return
+        finally:
+            self.compile_btn.state(['!disabled'])
+            self.root.config(cursor="")
 
     def draw_tree_on_canvas(self, canvas, root_node):
         if root_node is None:
